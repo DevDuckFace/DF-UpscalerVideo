@@ -1,0 +1,21 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "default",
+      "inherits": "vs2026",
+      "displayName": "This machine",
+      "environment": {
+        "VCPKG_ROOT": "C:/vcpkg",
+        "QT_PREFIX": "C:/Qt/6.10.1/msvc2022_64"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "default",
+      "configurePreset": "default",
+      "configuration": "Release"
+    }
+  ]
+}

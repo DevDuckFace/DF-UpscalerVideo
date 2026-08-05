@@ -1,0 +1,17 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "df-upscalervideo",
+  "version": "0.1.0",
+  "description": "GPU video upscaling, frame interpolation and restoration for Windows",
+  "builtin-baseline": "38d91be5efb2f21fbef4a3c53295002823747431",
+  "dependencies": [
+    "spdlog",
+    "nlohmann-json",
+    {
+      "name": "ncnn",
+      "features": [
+        "vulkan"
+      ]
+    }
+  ]
+}
