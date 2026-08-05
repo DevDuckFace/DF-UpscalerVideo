@@ -1,5 +1,6 @@
 #include "ui/SettingsPanel.h"
 
+#include "engine/ModelCatalog.h"
 #include "engine/VulkanContext.h"
 #include "media/FfmpegEncoder.h"
 
@@ -121,12 +122,21 @@ void SettingsPanel::buildUi()
     }
     upscaleForm->addRow(tr("Method:"), m_upscaleMethod);
 
+    // Populated from whatever is actually in the models folder, so dropping a
+    // converted ncnn model in there is enough to make it selectable.
     m_upscaleModel = new QComboBox(upscaleBox);
-    m_upscaleModel->addItem(tr("Anime video v3 - fast"),
-                            QStringLiteral("realesr-animevideov3"));
-    m_upscaleModel->addItem(tr("x4plus - general purpose"), QStringLiteral("realesrgan-x4plus"));
-    m_upscaleModel->addItem(tr("x4plus anime - stills"),
-                            QStringLiteral("realesrgan-x4plus-anime"));
+    m_models = discoverUpscaleModels();
+    for (const UpscaleModelInfo& model : m_models) {
+        m_upscaleModel->addItem(model.displayName, model.name);
+        if (!model.description.isEmpty()) {
+            m_upscaleModel->setItemData(m_upscaleModel->count() - 1, model.description,
+                                        Qt::ToolTipRole);
+        }
+    }
+    if (m_models.isEmpty()) {
+        m_upscaleModel->addItem(tr("No models found in the models folder"), QString());
+        m_upscaleModel->setEnabled(false);
+    }
     upscaleForm->addRow(tr("AI model:"), m_upscaleModel);
 
     m_outputResolution = new QLabel(upscaleBox);
@@ -367,13 +377,8 @@ void SettingsPanel::pullFromWidgets()
     m_spec.upscaleFactor = m_upscaleFactor->currentData().toInt();
     m_spec.upscaleMethod = upscaleMethodFromKey(m_upscaleMethod->currentData().toString());
     m_spec.upscaleModel = m_upscaleModel->currentData().toString();
-
-    // Only the animevideov3 family ships weights for x2 and x3; the x4plus
-    // models exist at x4 only, so selecting one pins the factor.
-    if (m_spec.upscaleMethod == UpscaleMethod::RealEsrganNcnn
-        && !m_spec.upscaleModel.contains(QLatin1String("animevideov3"))) {
-        m_spec.upscaleFactor = 4;
-    }
+    // The factor is constrained to the scales the selected model ships, in
+    // syncFactorOptions.
 
     m_spec.encoder = m_encoder->currentData().toString();
     m_spec.quality = m_quality->value();
@@ -390,6 +395,57 @@ void SettingsPanel::pullFromWidgets()
                 + QLatin1Char('.') + m_spec.container;
         }
     }
+}
+
+void SettingsPanel::syncFactorOptions(bool aiSelected)
+{
+    // The factors offered come from the weights that exist on disk. A model
+    // that only ships x4 must not let the user pick x2 and then fail at load.
+    QList<int> scales{2, 3, 4};
+
+    if (aiSelected) {
+        const QString modelName = m_upscaleModel->currentData().toString();
+        for (const UpscaleModelInfo& model : m_models) {
+            if (model.name == modelName) {
+                scales = model.scales;
+                break;
+            }
+        }
+    }
+
+    if (scales.isEmpty()) {
+        scales = {4};
+    }
+
+    QList<int> current;
+    current.reserve(m_upscaleFactor->count());
+    for (int i = 0; i < m_upscaleFactor->count(); ++i) {
+        current.append(m_upscaleFactor->itemData(i).toInt());
+    }
+    if (current == scales) {
+        m_upscaleFactor->setToolTip(scales.size() == 1
+                                        ? tr("This model only provides x%1 weights.").arg(scales.first())
+                                        : QString());
+        return;
+    }
+
+    const int wanted = m_upscaleFactor->currentData().toInt();
+
+    const bool blocked = m_populating;
+    m_populating = true;
+    m_upscaleFactor->clear();
+    for (int scale : scales) {
+        m_upscaleFactor->addItem(tr("%1x").arg(scale), scale);
+    }
+    const int index = m_upscaleFactor->findData(wanted);
+    m_upscaleFactor->setCurrentIndex(index >= 0 ? index : 0);
+    m_populating = blocked;
+
+    m_spec.upscaleFactor = m_upscaleFactor->currentData().toInt();
+
+    m_upscaleFactor->setToolTip(scales.size() == 1
+                                    ? tr("This model only provides x%1 weights.").arg(scales.first())
+                                    : QString());
 }
 
 void SettingsPanel::setSourceFps(int fpsNum, int fpsDen)
@@ -440,25 +496,12 @@ void SettingsPanel::updateDerivedLabels()
     const bool ai = upscaling
                     && upscaleMethodFromKey(m_upscaleMethod->currentData().toString())
                            == UpscaleMethod::RealEsrganNcnn;
-    const bool fixedAtX4 =
-        ai && !m_upscaleModel->currentData().toString().contains(QLatin1String("animevideov3"));
 
     m_upscaleMethod->setEnabled(upscaling);
-    m_upscaleModel->setEnabled(ai);
-    m_upscaleFactor->setEnabled(upscaling && !fixedAtX4);
+    m_upscaleModel->setEnabled(ai && !m_models.isEmpty());
+    m_upscaleFactor->setEnabled(upscaling);
 
-    if (fixedAtX4) {
-        const int index = m_upscaleFactor->findData(4);
-        if (index >= 0 && m_upscaleFactor->currentIndex() != index) {
-            const bool blocked = m_populating;
-            m_populating = true;
-            m_upscaleFactor->setCurrentIndex(index);
-            m_populating = blocked;
-        }
-        m_upscaleFactor->setToolTip(tr("This model only provides x4 weights."));
-    } else {
-        m_upscaleFactor->setToolTip(QString());
-    }
+    syncFactorOptions(ai);
 
     if (m_sourceWidth > 0 && m_sourceHeight > 0) {
         const int factor = upscaling ? m_upscaleFactor->currentData().toInt() : 1;

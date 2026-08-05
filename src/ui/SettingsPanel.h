@@ -1,7 +1,9 @@
 #pragma once
 
 #include "core/JobSpec.h"
+#include "engine/ModelCatalog.h"
 
+#include <QList>
 #include <QWidget>
 
 class QCheckBox;
@@ -39,6 +41,7 @@ private:
     void pullFromWidgets();
     void pushToWidgets();
     void updateDerivedLabels();
+    void syncFactorOptions(bool aiSelected);
     void emitEdit();
 
     JobSpec m_spec;
@@ -47,6 +50,7 @@ private:
     int m_sourceHeight = 0;
     int m_sourceFpsNum = 0;
     int m_sourceFpsDen = 1;
+    QList<UpscaleModelInfo> m_models;
 
     QCheckBox* m_deinterlace = nullptr;
     QComboBox* m_denoise = nullptr;

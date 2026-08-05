@@ -1,0 +1,51 @@
+DF-UpscalerVideo -- third-party components
+==========================================
+
+This application bundles software produced by other projects. The components
+below are redistributed under their own terms.
+
+
+Qt 6 (The Qt Company and contributors)
+--------------------------------------
+Used under the GNU Lesser General Public License v3. Qt is linked dynamically
+and its libraries ship as separate DLL files, so they can be replaced with
+compatible builds. Source is available from https://download.qt.io/
+
+
+FFmpeg (FFmpeg project)
+-----------------------
+ffmpeg.exe and ffprobe.exe are invoked as separate processes over their
+documented command line interface. They are not linked into the application.
+
+  >> The specific build shipped with this installer, and the licence that
+  >> applies to it, are recorded in bin\FFMPEG-BUILD.txt.
+
+FFmpeg is distributed in LGPL and GPL configurations depending on which
+encoders and filters are compiled in. A GPL build carries obligations that an
+LGPL build does not. This project targets an LGPL build providing NVENC
+(h264_nvenc, hevc_nvenc) and libx264; that configuration excludes libx265,
+libxvid, and several GPL-only filters.
+
+Source is available from https://ffmpeg.org/
+
+
+ncnn (Tencent)
+--------------
+Used under the BSD 3-Clause Licence. Linked into the application.
+
+
+spdlog (Gabime)
+---------------
+Used under the MIT Licence.
+
+
+nlohmann/json (Niels Lohmann)
+-----------------------------
+Used under the MIT Licence.
+
+
+Real-ESRGAN and RIFE model weights
+----------------------------------
+The bundled .param/.bin model files originate from the Real-ESRGAN and RIFE
+projects and are redistributed under their respective licences. See the
+models folder.

@@ -67,6 +67,8 @@ qt_add_library(dfu_core STATIC
     src/engine/PassthroughProcessor.cpp
     src/engine/VulkanContext.h
     src/engine/VulkanContext.cpp
+    src/engine/ModelCatalog.h
+    src/engine/ModelCatalog.cpp
     src/engine/RealEsrganNcnn.h
     src/engine/RealEsrganNcnn.cpp
     src/engine/RifeNcnn.h

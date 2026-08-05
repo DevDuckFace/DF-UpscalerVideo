@@ -1,6 +1,7 @@
 #include "core/AppInfo.h"
 #include "core/JobSpec.h"
 #include "core/Logging.h"
+#include "engine/ModelCatalog.h"
 #include "engine/VulkanContext.h"
 #include "media/FfmpegPaths.h"
 #include "pipeline/JobRunner.h"
@@ -221,7 +222,6 @@ int runCli(const QCommandLineParser& parser, const CliOptions& options)
 
     const int factor = parser.value(options.scale).toInt();
     spec.upscaleFactor = std::clamp(factor <= 0 ? 2 : factor, 1, 4);
-    spec.upscaleEnabled = spec.upscaleFactor > 1;
 
     const QString denoise = parser.value(options.denoise).toLower();
     spec.denoiseFilter = denoise == QLatin1String("none") ? QString() : denoise;
@@ -255,10 +255,32 @@ int runCli(const QCommandLineParser& parser, const CliOptions& options)
         spec.upscaleMethod = dfu::UpscaleMethod::FfmpegLanczos;
     }
 
-    if (spec.upscaleMethod == dfu::UpscaleMethod::RealEsrganNcnn
-        && !spec.upscaleModel.contains(QLatin1String("animevideov3"))) {
-        spec.upscaleFactor = 4;
+    if (spec.upscaleMethod == dfu::UpscaleMethod::RealEsrganNcnn) {
+        // Constrain the factor to the scales the chosen model actually ships,
+        // rather than guessing from its name. A 1x model is a restoration
+        // pass: the AI stage still runs, it just does not change the size.
+        QList<int> scales;
+        const QList<dfu::UpscaleModelInfo> models = dfu::discoverUpscaleModels();
+        for (const dfu::UpscaleModelInfo& info : models) {
+            if (info.name == spec.upscaleModel) {
+                scales = info.scales;
+                break;
+            }
+        }
+
+        if (scales.isEmpty()) {
+            spdlog::error("Model '{}' was not found in {}", spec.upscaleModel.toStdString(),
+                          dfu::modelsDirectory().toStdString());
+            return kExitUsage;
+        }
+        if (!scales.contains(spec.upscaleFactor)) {
+            spdlog::warn("Model '{}' has no x{} weights; using x{} instead",
+                         spec.upscaleModel.toStdString(), spec.upscaleFactor, scales.first());
+            spec.upscaleFactor = scales.first();
+        }
         spec.upscaleEnabled = true;
+    } else {
+        spec.upscaleEnabled = spec.upscaleFactor > 1;
     }
 
     dfu::JobRunner runner;
